@@ -51,6 +51,15 @@
       </div>
 
       <div style="margin-top: 3rem;">
+        <h2 style="margin-bottom: 1.5rem;">My Lesson Requests</h2>
+        <div id="my-requests" class="card-grid"></div>
+        <div id="no-requests" style="display: none; text-align: center; padding: 2rem;">
+          <p>You haven't requested any lessons yet.</p>
+          <a href="/lessons.html" class="btn btn-primary" style="margin-top: 1rem;">Browse Lessons</a>
+        </div>
+      </div>
+
+      <div style="margin-top: 3rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
           <h2>My Bookings</h2>
           <a href="/booking.html" class="btn btn-primary" id="book-class-btn" style="display: none;">Book a Class</a>
@@ -111,6 +120,34 @@
           });
         }
 
+        // Load and display lesson requests
+        const requests = await lessonRequestsAPI.getMyRequests();
+        const requestsContainer = document.getElementById('my-requests');
+        if (requests.length === 0) {
+          document.getElementById('no-requests').style.display = 'block';
+        } else {
+          requests.forEach(request => {
+            const requestCard = document.createElement('div');
+            requestCard.className = 'card';
+            const date = new Date(request.requestedDate);
+            const statusClass = request.status === 'approved' ? 'badge-success' : 
+                               request.status === 'rejected' ? 'badge-danger' : 
+                               request.status === 'pending' ? 'badge-warning' : 'badge';
+            
+            requestCard.innerHTML = `
+              <h3>${request.lessonId?.title || 'Lesson'}</h3>
+              <p><strong>Date:</strong> ${date.toLocaleDateString()}</p>
+              <p><strong>Time:</strong> ${request.requestedTime}</p>
+              <p><strong>Status:</strong> <span class="badge ${statusClass}">${request.status}</span></p>
+              ${request.message ? `<p style="margin-top: 0.5rem;"><strong>Your message:</strong> ${request.message}</p>` : ''}
+              ${request.teacherResponse ? `<p style="margin-top: 0.5rem; color: var(--text-light);"><strong>Teacher:</strong> ${request.teacherResponse}</p>` : ''}
+              ${request.status === 'approved' ? `<a href="/checkout.html?type=lesson&id=${request.lessonId._id}&requestId=${request._id}" class="btn btn-primary" style="margin-top: 0.5rem; width: 100%;">Complete Payment</a>` : ''}
+              ${request.status === 'pending' ? `<button class="btn btn-outline" onclick="cancelRequest('${request._id}')" style="margin-top: 0.5rem; width: 100%;">Cancel Request</button>` : ''}
+            `;
+            requestsContainer.appendChild(requestCard);
+          });
+        }
+
         // Show book class button if user has active subscription
         const hasActiveSubscription = subscriptions.some(s => s.status === 'active');
         if (hasActiveSubscription) {
@@ -156,7 +193,32 @@
       }
     };
 
+    const cancelRequest = async (id) => {
+      if (!confirm('Are you sure you want to cancel this request?')) return;
+      
+      try {
+        await lessonRequestsAPI.cancel(id);
+        window.location.reload();
+      } catch (error) {
+        alert(error.message || 'Failed to cancel request');
+      }
+    };
+
     window.cancelBooking = cancelBooking;
+    window.cancelRequest = cancelRequest;
+
+    const cancelRequest = async (id) => {
+      if (!confirm('Are you sure you want to cancel this request?')) return;
+      
+      try {
+        await lessonRequestsAPI.cancel(id);
+        window.location.reload();
+      } catch (error) {
+        alert(error.message || 'Failed to cancel request');
+      }
+    };
+
+    window.cancelRequest = cancelRequest;
   </script>
 </body>
 </html>

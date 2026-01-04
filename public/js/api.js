@@ -174,6 +174,53 @@ const bookingsAPI = {
   }
 };
 
+// Lesson Requests API
+const lessonRequestsAPI = {
+  create: async (lessonId, requestedDate, requestedTime, message) => {
+    return apiRequest('/lesson-requests', {
+      method: 'POST',
+      body: JSON.stringify({ lessonId, requestedDate, requestedTime, message })
+    });
+  },
+
+  getMyRequests: async () => {
+    return apiRequest('/lesson-requests/my-requests');
+  },
+
+  getPending: async () => {
+    return apiRequest('/lesson-requests/pending');
+  },
+
+  getAll: async (status) => {
+    const query = status ? `?status=${status}` : '';
+    return apiRequest(`/lesson-requests${query}`);
+  },
+
+  getById: async (id) => {
+    return apiRequest(`/lesson-requests/${id}`);
+  },
+
+  approve: async (id, teacherResponse) => {
+    return apiRequest(`/lesson-requests/${id}/approve`, {
+      method: 'PUT',
+      body: JSON.stringify({ teacherResponse })
+    });
+  },
+
+  reject: async (id, teacherResponse) => {
+    return apiRequest(`/lesson-requests/${id}/reject`, {
+      method: 'PUT',
+      body: JSON.stringify({ teacherResponse })
+    });
+  },
+
+  cancel: async (id) => {
+    return apiRequest(`/lesson-requests/${id}/cancel`, {
+      method: 'PUT'
+    });
+  }
+};
+
 // Admin API
 const adminAPI = {
   getStats: async () => {
@@ -214,4 +261,5 @@ const requireAdmin = () => {
   }
   return true;
 };
+
 

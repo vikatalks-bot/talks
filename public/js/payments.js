@@ -100,3 +100,4 @@ window.handleStripePayment = handleStripePayment;
 window.handlePayPalPayment = handlePayPalPayment;
 window.processPayment = processPayment;
 
+

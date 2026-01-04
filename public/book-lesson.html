@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book Lesson - English Learning Platform</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+</head>
+<body>
+  <header>
+    <nav class="container">
+      <a href="/" class="logo">English Master</a>
+      <ul class="nav-links">
+        <li><a href="/lessons.html">Lessons</a></li>
+        <li><a href="/dashboard.html">Dashboard</a></li>
+        <li id="auth-nav"></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="container" style="padding: 2rem 0; max-width: 800px;">
+      <h1 style="margin-bottom: 2rem;">Book a Lesson</h1>
+
+      <div id="lesson-info" class="card" style="margin-bottom: 2rem;">
+        <div class="spinner"></div>
+      </div>
+
+      <div class="card">
+        <h2 style="margin-bottom: 1.5rem;">Select Date & Time</h2>
+        
+        <div class="form-group">
+          <label for="requested-date">Choose Date *</label>
+          <input type="text" id="requested-date" placeholder="Select date" readonly required>
+          <small>Select a date for your lesson</small>
+        </div>
+
+        <div class="form-group">
+          <label for="requested-time">Choose Time *</label>
+          <select id="requested-time" required>
+            <option value="">Select time</option>
+            <option value="09:00">9:00 AM</option>
+            <option value="10:00">10:00 AM</option>
+            <option value="11:00">11:00 AM</option>
+            <option value="12:00">12:00 PM</option>
+            <option value="13:00">1:00 PM</option>
+            <option value="14:00">2:00 PM</option>
+            <option value="15:00">3:00 PM</option>
+            <option value="16:00">4:00 PM</option>
+            <option value="17:00">5:00 PM</option>
+            <option value="18:00">6:00 PM</option>
+            <option value="19:00">7:00 PM</option>
+            <option value="20:00">8:00 PM</option>
+          </select>
+          <small>Select your preferred time (all times in your local timezone)</small>
+        </div>
+
+        <div class="form-group">
+          <label for="message">Message to Teacher (Optional)</label>
+          <textarea id="message" rows="4" placeholder="Any special requests, topics you want to focus on, or notes for the teacher..."></textarea>
+          <small>Let the teacher know if you have any specific requirements</small>
+        </div>
+
+        <div id="error-message" class="alert alert-error" style="display: none;"></div>
+        <div id="success-message" class="alert alert-success" style="display: none;"></div>
+
+        <button class="btn btn-primary" style="width: 100%; padding: 1rem; font-size: 1.1rem;" onclick="submitBookingRequest()">
+          Send Booking Request
+        </button>
+        <p style="text-align: center; margin-top: 1rem; color: var(--text-light); font-size: 0.875rem;">
+          The teacher will review your request and get back to you. You'll receive a notification once it's approved.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2024 English Master. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script>
+    let lessonId = null;
+    let lesson = null;
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!requireAuth()) return;
+
+      // Get lesson ID from URL
+      const urlParams = new URLSearchParams(window.location.search);
+      lessonId = urlParams.get('lessonId');
+
+      if (!lessonId) {
+        alert('No lesson selected. Redirecting...');
+        window.location.href = '/lessons.html';
+        return;
+      }
+
+      loadLesson();
+      initDatePicker();
+
+      // Update nav for auth
+      const user = getUser();
+      const authNav = document.getElementById('auth-nav');
+      if (user) {
+        authNav.innerHTML = `
+          <li><button class="btn btn-primary" onclick="handleLogout()">Logout</button></li>
+        `;
+      }
+    });
+
+    // Load lesson details
+    const loadLesson = async () => {
+      try {
+        lesson = await lessonsAPI.getById(lessonId);
+        displayLessonInfo();
+      } catch (error) {
+        console.error('Error loading lesson:', error);
+        document.getElementById('lesson-info').innerHTML = `
+          <div class="alert alert-error">
+            Error loading lesson. <a href="/lessons.html">Go back to lessons</a>
+          </div>
+        `;
+      }
+    };
+
+    // Display lesson info
+    const displayLessonInfo = () => {
+      const container = document.getElementById('lesson-info');
+      container.innerHTML = `
+        <h2>${lesson.title}</h2>
+        <p style="color: var(--text-light); margin: 1rem 0;">${lesson.description}</p>
+        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+          <span class="level">${lesson.level}</span>
+          ${lesson.category ? `<span class="level">${lesson.category}</span>` : ''}
+        </div>
+        <div class="price" style="margin-top: 1rem;">$${lesson.price.toFixed(2)}</div>
+        <p style="margin-top: 1rem; color: var(--text-light); font-size: 0.875rem;">
+          After the teacher approves your request, you'll be able to complete the payment.
+        </p>
+      `;
+    };
+
+    // Initialize date picker
+    const initDatePicker = () => {
+      flatpickr("#requested-date", {
+        minDate: "today",
+        dateFormat: "Y-m-d",
+        disable: [
+          function(date) {
+            // Disable weekends (optional - you can remove this if you want weekends)
+            return (date.getDay() === 0 || date.getDay() === 6);
+          }
+        ]
+      });
+    };
+
+    // Submit booking request
+    const submitBookingRequest = async () => {
+      const requestedDate = document.getElementById('requested-date').value;
+      const requestedTime = document.getElementById('requested-time').value;
+      const message = document.getElementById('message').value;
+
+      // Validation
+      if (!requestedDate || !requestedTime) {
+        showError('Please select both date and time');
+        return;
+      }
+
+      try {
+        const response = await lessonRequestsAPI.create(lessonId, requestedDate, requestedTime, message);
+
+        showSuccess('Booking request sent successfully! The teacher will review it and get back to you soon.');
+        
+        // Disable form
+        document.getElementById('requested-date').disabled = true;
+        document.getElementById('requested-time').disabled = true;
+        document.getElementById('message').disabled = true;
+        document.querySelector('button').disabled = true;
+        document.querySelector('button').textContent = 'Request Sent';
+        
+        setTimeout(() => {
+          window.location.href = '/dashboard.html';
+        }, 3000);
+      } catch (error) {
+        showError(error.message || 'Failed to send booking request. Please try again.');
+      }
+    };
+
+    const showError = (message) => {
+      const errorDiv = document.getElementById('error-message');
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+      setTimeout(() => {
+        errorDiv.style.display = 'none';
+      }, 5000);
+    };
+
+    const showSuccess = (message) => {
+      const successDiv = document.getElementById('success-message');
+      successDiv.textContent = message;
+      successDiv.style.display = 'block';
+    };
+  </script>
+</body>
+</html>
+

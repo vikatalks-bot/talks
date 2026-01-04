@@ -92,7 +92,8 @@
             ${lesson.category ? `<span class="level">${lesson.category}</span>` : ''}
           </div>
           <div class="price">$${lesson.price.toFixed(2)}</div>
-          <a href="/checkout.html?type=lesson&id=${lesson._id}" class="btn btn-primary" style="width: 100%;">Purchase Lesson</a>
+          <a href="/book-lesson.html?lessonId=${lesson._id}" class="btn btn-primary" style="width: 100%; margin-bottom: 0.5rem;">Book Lesson with Teacher</a>
+          <a href="/checkout.html?type=lesson&id=${lesson._id}" class="btn btn-outline" style="width: 100%;">Purchase Pre-recorded</a>
         `;
         container.appendChild(lessonCard);
       });
@@ -135,4 +136,5 @@
   </script>
 </body>
 </html>
+
 

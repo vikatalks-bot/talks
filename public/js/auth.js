@@ -130,3 +130,4 @@ window.handleRegister = handleRegister;
 window.handleLogin = handleLogin;
 window.handleLogout = handleLogout;
 
+

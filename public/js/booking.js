@@ -143,3 +143,4 @@ const showSuccess = (message) => {
 window.createBooking = createBooking;
 window.initCalendar = initCalendar;
 
+

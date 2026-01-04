@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Lesson Requests - Admin</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="admin-container">
+    <aside class="admin-sidebar">
+      <h2>Admin Panel</h2>
+      <ul class="admin-menu">
+        <li><a href="/admin/admin.html">Dashboard</a></li>
+        <li><a href="/admin/manage-lessons.html">Manage Lessons</a></li>
+        <li><a href="/admin/manage-bookings.html">Manage Bookings</a></li>
+        <li><a href="/admin/manage-requests.html" class="active">Manage Requests</a></li>
+        <li><a href="/dashboard.html">User Dashboard</a></li>
+        <li><a href="#" onclick="handleLogout()">Logout</a></li>
+      </ul>
+    </aside>
+
+    <main class="admin-content">
+      <div class="admin-header">
+        <h1>Manage Lesson Requests</h1>
+        <div style="display: flex; gap: 1rem;">
+          <select id="status-filter" onchange="filterRequests()" style="padding: 0.5rem;">
+            <option value="">All Requests</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table">
+          <table>
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Lesson</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Status</th>
+                <th>Message</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="requests-table">
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 2rem;">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Approve/Reject Modal -->
+  <div id="request-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title">Respond to Request</h3>
+        <button class="close-btn" onclick="closeRequestModal()">&times;</button>
+      </div>
+      <form id="request-form" onsubmit="saveRequestResponse(event)">
+        <div class="form-group">
+          <label for="request-action">Action</label>
+          <select id="request-action" required>
+            <option value="approve">Approve</option>
+            <option value="reject">Reject</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="teacher-response">Response Message (Optional)</label>
+          <textarea id="teacher-response" rows="4" placeholder="Add a message for the student..."></textarea>
+        </div>
+        <input type="hidden" id="request-id">
+        <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Save</button>
+          <button type="button" class="btn btn-outline" onclick="closeRequestModal()" style="flex: 1;">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    let allRequests = [];
+
+    // Load requests
+    const loadRequests = async (status = '') => {
+      if (!requireAdmin()) return;
+
+      try {
+        allRequests = await lessonRequestsAPI.getAll(status);
+        displayRequests();
+      } catch (error) {
+        console.error('Error loading requests:', error);
+        document.getElementById('requests-table').innerHTML = 
+          '<tr><td colspan="7" style="text-align: center; padding: 2rem;">Error loading requests</td></tr>';
+      }
+    };
+
+    // Display requests
+    const displayRequests = () => {
+      const table = document.getElementById('requests-table');
+      
+      if (allRequests.length === 0) {
+        table.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">No requests found</td></tr>';
+        return;
+      }
+
+      table.innerHTML = allRequests.map(request => {
+        const date = new Date(request.requestedDate);
+        const userName = request.userId?.name || 'N/A';
+        const userEmail = request.userId?.email || '';
+        const lessonTitle = request.lessonId?.title || 'N/A';
+        const statusClass = request.status === 'approved' ? 'badge-success' : 
+                           request.status === 'rejected' ? 'badge-danger' : 
+                           request.status === 'pending' ? 'badge-warning' : 'badge';
+        
+        return `
+          <tr>
+            <td>
+              <div>${userName}</div>
+              <small style="color: var(--text-light);">${userEmail}</small>
+            </td>
+            <td>${lessonTitle}</td>
+            <td>${date.toLocaleDateString()}</td>
+            <td>${request.requestedTime}</td>
+            <td><span class="badge ${statusClass}">${request.status}</span></td>
+            <td>${request.message ? `<small>${request.message.substring(0, 50)}${request.message.length > 50 ? '...' : ''}</small>` : '-'}</td>
+            <td class="actions">
+              ${request.status === 'pending' ? `
+                <button class="btn btn-primary btn-sm" onclick="openRequestModal('${request._id}', 'approve')">Approve</button>
+                <button class="btn btn-danger btn-sm" onclick="openRequestModal('${request._id}', 'reject')">Reject</button>
+              ` : `
+                ${request.teacherResponse ? `<small>${request.teacherResponse.substring(0, 30)}...</small>` : '-'}
+              `}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    };
+
+    // Filter requests
+    const filterRequests = () => {
+      const status = document.getElementById('status-filter').value;
+      loadRequests(status);
+    };
+
+    // Open request modal
+    const openRequestModal = (id, action) => {
+      document.getElementById('request-id').value = id;
+      document.getElementById('request-action').value = action;
+      document.getElementById('modal-title').textContent = action === 'approve' ? 'Approve Request' : 'Reject Request';
+      document.getElementById('teacher-response').value = '';
+      document.getElementById('request-modal').classList.add('active');
+    };
+
+    // Close modal
+    const closeRequestModal = () => {
+      document.getElementById('request-modal').classList.remove('active');
+    };
+
+    // Save request response
+    const saveRequestResponse = async (e) => {
+      e.preventDefault();
+      if (!requireAdmin()) return;
+
+      const requestId = document.getElementById('request-id').value;
+      const action = document.getElementById('request-action').value;
+      const teacherResponse = document.getElementById('teacher-response').value;
+
+      try {
+        if (action === 'approve') {
+          await lessonRequestsAPI.approve(requestId, teacherResponse);
+        } else {
+          await lessonRequestsAPI.reject(requestId, teacherResponse);
+        }
+
+        closeRequestModal();
+        loadRequests(document.getElementById('status-filter').value);
+      } catch (error) {
+        alert(error.message || 'Failed to update request');
+      }
+    };
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      loadRequests();
+    });
+
+    window.filterRequests = filterRequests;
+    window.openRequestModal = openRequestModal;
+    window.closeRequestModal = closeRequestModal;
+    window.saveRequestResponse = saveRequestResponse;
+  </script>
+</body>
+</html>
+
