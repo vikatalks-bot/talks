@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lessons - English Learning Platform</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <nav class="container">
+      <a href="/" class="logo">English Master</a>
+      <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/lessons.html">Lessons</a></li>
+        <li><a href="/speaking-classes.html">Speaking Classes</a></li>
+        <li id="auth-nav"></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="container" style="padding: 2rem 0;">
+      <h1 style="margin-bottom: 2rem;">English Lessons</h1>
+
+      <div style="margin-bottom: 2rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+        <select id="level-filter" class="form-group" style="flex: 1; min-width: 150px;">
+          <option value="">All Levels</option>
+          <option value="beginner">Beginner</option>
+          <option value="intermediate">Intermediate</option>
+          <option value="advanced">Advanced</option>
+        </select>
+
+        <input type="text" id="search-input" placeholder="Search lessons..." style="flex: 2; padding: 0.75rem; border: 2px solid var(--border-color); border-radius: 0.5rem;">
+      </div>
+
+      <div id="lessons-container" class="card-grid">
+        <div class="spinner"></div>
+      </div>
+
+      <div id="no-lessons" style="display: none; text-align: center; padding: 2rem;">
+        <p>No lessons found. Try adjusting your filters.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2024 English Master. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    let allLessons = [];
+
+    // Load lessons
+    const loadLessons = async (filters = {}) => {
+      try {
+        const lessons = await lessonsAPI.getAll(filters);
+        allLessons = lessons;
+        displayLessons(lessons);
+      } catch (error) {
+        console.error('Error loading lessons:', error);
+        document.getElementById('lessons-container').innerHTML = '<p>Error loading lessons. Please try again.</p>';
+      }
+    };
+
+    // Display lessons
+    const displayLessons = (lessons) => {
+      const container = document.getElementById('lessons-container');
+      const noLessons = document.getElementById('no-lessons');
+
+      if (lessons.length === 0) {
+        container.innerHTML = '';
+        noLessons.style.display = 'block';
+        return;
+      }
+
+      noLessons.style.display = 'none';
+      container.innerHTML = '';
+
+      lessons.forEach(lesson => {
+        const lessonCard = document.createElement('div');
+        lessonCard.className = 'card lesson-card';
+        lessonCard.innerHTML = `
+          <h3>${lesson.title}</h3>
+          <p>${lesson.description}</p>
+          <div style="margin: 1rem 0;">
+            <span class="level">${lesson.level}</span>
+            ${lesson.category ? `<span class="level">${lesson.category}</span>` : ''}
+          </div>
+          <div class="price">$${lesson.price.toFixed(2)}</div>
+          <a href="/checkout.html?type=lesson&id=${lesson._id}" class="btn btn-primary" style="width: 100%;">Purchase Lesson</a>
+        `;
+        container.appendChild(lessonCard);
+      });
+    };
+
+    // Filter lessons
+    const filterLessons = () => {
+      const level = document.getElementById('level-filter').value;
+      const search = document.getElementById('search-input').value.toLowerCase();
+
+      const filters = {};
+      if (level) filters.level = level;
+      if (search) filters.search = search;
+
+      loadLessons(filters);
+    };
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      loadLessons();
+      
+      document.getElementById('level-filter').addEventListener('change', filterLessons);
+      document.getElementById('search-input').addEventListener('input', filterLessons);
+
+      // Update nav for auth
+      const user = getUser();
+      const authNav = document.getElementById('auth-nav');
+      if (user) {
+        authNav.innerHTML = `
+          <li><a href="/dashboard.html">Dashboard</a></li>
+          <li><button class="btn btn-primary" onclick="handleLogout()">Logout</button></li>
+        `;
+      } else {
+        authNav.innerHTML = `
+          <li><a href="/login.html" class="btn btn-outline">Login</a></li>
+          <li><a href="/register.html" class="btn btn-primary">Sign Up</a></li>
+        `;
+      }
+    });
+  </script>
+</body>
+</html>
+

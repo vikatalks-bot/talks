@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Lessons - Admin</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="admin-container">
+    <aside class="admin-sidebar">
+      <h2>Admin Panel</h2>
+      <ul class="admin-menu">
+        <li><a href="/admin/admin.html">Dashboard</a></li>
+        <li><a href="/admin/manage-lessons.html" class="active">Manage Lessons</a></li>
+        <li><a href="/admin/manage-bookings.html">Manage Bookings</a></li>
+        <li><a href="/dashboard.html">User Dashboard</a></li>
+        <li><a href="#" onclick="handleLogout()">Logout</a></li>
+      </ul>
+    </aside>
+
+    <main class="admin-content">
+      <div class="admin-header">
+        <h1>Manage Lessons</h1>
+        <button class="btn btn-primary" onclick="openAddLessonModal()">Add New Lesson</button>
+      </div>
+
+      <div class="card">
+        <div class="table">
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Level</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Type</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="lessons-table">
+              <tr>
+                <td colspan="6" style="text-align: center; padding: 2rem;">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Add/Edit Lesson Modal -->
+  <div id="lesson-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title">Add New Lesson</h3>
+        <button class="close-btn" onclick="closeLessonModal()">&times;</button>
+      </div>
+      <form id="lesson-form" onsubmit="saveLesson(event)">
+        <div class="form-group">
+          <label for="lesson-title">Title</label>
+          <input type="text" id="lesson-title" required>
+        </div>
+        <div class="form-group">
+          <label for="lesson-description">Description</label>
+          <textarea id="lesson-description" rows="4" required></textarea>
+        </div>
+        <div class="form-group">
+          <label for="lesson-price">Price ($)</label>
+          <input type="number" id="lesson-price" step="0.01" min="0" required>
+        </div>
+        <div class="form-group">
+          <label for="lesson-level">Level</label>
+          <select id="lesson-level" required>
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="lesson-category">Category</label>
+          <input type="text" id="lesson-category">
+        </div>
+        <div class="form-group">
+          <label for="lesson-video-url">Video URL</label>
+          <input type="url" id="lesson-video-url">
+        </div>
+        <div class="form-group">
+          <label for="lesson-duration">Duration (minutes)</label>
+          <input type="number" id="lesson-duration" min="0">
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="lesson-is-live"> Live Lesson
+          </label>
+        </div>
+        <input type="hidden" id="lesson-id">
+        <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Save</button>
+          <button type="button" class="btn btn-outline" onclick="closeLessonModal()" style="flex: 1;">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    let allLessons = [];
+
+    // Load lessons
+    const loadLessons = async () => {
+      if (!requireAdmin()) return;
+
+      try {
+        allLessons = await lessonsAPI.getAll();
+        displayLessons();
+      } catch (error) {
+        console.error('Error loading lessons:', error);
+        document.getElementById('lessons-table').innerHTML = 
+          '<tr><td colspan="6" style="text-align: center; padding: 2rem;">Error loading lessons</td></tr>';
+      }
+    };
+
+    // Display lessons
+    const displayLessons = () => {
+      const table = document.getElementById('lessons-table');
+      
+      if (allLessons.length === 0) {
+        table.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">No lessons yet</td></tr>';
+        return;
+      }
+
+      table.innerHTML = allLessons.map(lesson => `
+        <tr>
+          <td>${lesson.title}</td>
+          <td>${lesson.level}</td>
+          <td>${lesson.category || 'N/A'}</td>
+          <td>$${lesson.price.toFixed(2)}</td>
+          <td>${lesson.isLive ? 'Live' : 'Pre-recorded'}</td>
+          <td class="actions">
+            <button class="btn btn-primary btn-sm" onclick="editLesson('${lesson._id}')">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteLesson('${lesson._id}')">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    };
+
+    // Open add lesson modal
+    const openAddLessonModal = () => {
+      document.getElementById('modal-title').textContent = 'Add New Lesson';
+      document.getElementById('lesson-form').reset();
+      document.getElementById('lesson-id').value = '';
+      document.getElementById('lesson-modal').classList.add('active');
+    };
+
+    // Edit lesson
+    const editLesson = (id) => {
+      const lesson = allLessons.find(l => l._id === id);
+      if (!lesson) return;
+
+      document.getElementById('modal-title').textContent = 'Edit Lesson';
+      document.getElementById('lesson-id').value = lesson._id;
+      document.getElementById('lesson-title').value = lesson.title;
+      document.getElementById('lesson-description').value = lesson.description;
+      document.getElementById('lesson-price').value = lesson.price;
+      document.getElementById('lesson-level').value = lesson.level;
+      document.getElementById('lesson-category').value = lesson.category || '';
+      document.getElementById('lesson-video-url').value = lesson.videoUrl || '';
+      document.getElementById('lesson-duration').value = lesson.duration || '';
+      document.getElementById('lesson-is-live').checked = lesson.isLive || false;
+      
+      document.getElementById('lesson-modal').classList.add('active');
+    };
+
+    // Close modal
+    const closeLessonModal = () => {
+      document.getElementById('lesson-modal').classList.remove('active');
+    };
+
+    // Save lesson
+    const saveLesson = async (e) => {
+      e.preventDefault();
+      if (!requireAdmin()) return;
+
+      const lessonId = document.getElementById('lesson-id').value;
+      const lessonData = {
+        title: document.getElementById('lesson-title').value,
+        description: document.getElementById('lesson-description').value,
+        price: parseFloat(document.getElementById('lesson-price').value),
+        level: document.getElementById('lesson-level').value,
+        category: document.getElementById('lesson-category').value,
+        videoUrl: document.getElementById('lesson-video-url').value,
+        duration: parseInt(document.getElementById('lesson-duration').value) || 0,
+        isLive: document.getElementById('lesson-is-live').checked
+      };
+
+      try {
+        if (lessonId) {
+          // Update existing lesson
+          await apiRequest(`/lessons/${lessonId}`, {
+            method: 'PUT',
+            body: JSON.stringify(lessonData)
+          });
+        } else {
+          // Create new lesson
+          await apiRequest('/lessons', {
+            method: 'POST',
+            body: JSON.stringify(lessonData)
+          });
+        }
+
+        closeLessonModal();
+        loadLessons();
+      } catch (error) {
+        alert(error.message || 'Failed to save lesson');
+      }
+    };
+
+    // Delete lesson
+    const deleteLesson = async (id) => {
+      if (!confirm('Are you sure you want to delete this lesson?')) return;
+      if (!requireAdmin()) return;
+
+      try {
+        await apiRequest(`/lessons/${id}`, {
+          method: 'DELETE'
+        });
+        loadLessons();
+      } catch (error) {
+        alert(error.message || 'Failed to delete lesson');
+      }
+    };
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', loadLessons);
+
+    window.openAddLessonModal = openAddLessonModal;
+    window.closeLessonModal = closeLessonModal;
+    window.saveLesson = saveLesson;
+    window.editLesson = editLesson;
+    window.deleteLesson = deleteLesson;
+  </script>
+</body>
+</html>
+

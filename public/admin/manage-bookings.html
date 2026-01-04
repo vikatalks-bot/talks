@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Bookings - Admin</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="admin-container">
+    <aside class="admin-sidebar">
+      <h2>Admin Panel</h2>
+      <ul class="admin-menu">
+        <li><a href="/admin/admin.html">Dashboard</a></li>
+        <li><a href="/admin/manage-lessons.html">Manage Lessons</a></li>
+        <li><a href="/admin/manage-bookings.html" class="active">Manage Bookings</a></li>
+        <li><a href="/dashboard.html">User Dashboard</a></li>
+        <li><a href="#" onclick="handleLogout()">Logout</a></li>
+      </ul>
+    </aside>
+
+    <main class="admin-content">
+      <div class="admin-header">
+        <h1>Manage Bookings</h1>
+      </div>
+
+      <div class="card">
+        <div class="table">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Student</th>
+                <th>Status</th>
+                <th>Zoom Link</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="bookings-table">
+              <tr>
+                <td colspan="6" style="text-align: center; padding: 2rem;">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Edit Booking Modal -->
+  <div id="booking-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Edit Booking</h3>
+        <button class="close-btn" onclick="closeBookingModal()">&times;</button>
+      </div>
+      <form id="booking-form" onsubmit="saveBooking(event)">
+        <div class="form-group">
+          <label for="booking-status">Status</label>
+          <select id="booking-status" required>
+            <option value="confirmed">Confirmed</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="booking-zoom-link">Zoom Link</label>
+          <input type="url" id="booking-zoom-link" placeholder="https://zoom.us/j/...">
+        </div>
+        <input type="hidden" id="booking-id">
+        <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Save</button>
+          <button type="button" class="btn btn-outline" onclick="closeBookingModal()" style="flex: 1;">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    let allBookings = [];
+
+    // Load bookings
+    const loadBookings = async () => {
+      if (!requireAdmin()) return;
+
+      try {
+        allBookings = await bookingsAPI.getAll();
+        displayBookings();
+      } catch (error) {
+        console.error('Error loading bookings:', error);
+        document.getElementById('bookings-table').innerHTML = 
+          '<tr><td colspan="6" style="text-align: center; padding: 2rem;">Error loading bookings</td></tr>';
+      }
+    };
+
+    // Display bookings
+    const displayBookings = () => {
+      const table = document.getElementById('bookings-table');
+      
+      if (allBookings.length === 0) {
+        table.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">No bookings yet</td></tr>';
+        return;
+      }
+
+      // Sort by date
+      allBookings.sort((a, b) => new Date(a.classDate) - new Date(b.classDate));
+
+      table.innerHTML = allBookings.map(booking => {
+        const date = new Date(booking.classDate);
+        const userName = booking.userId?.name || 'N/A';
+        const statusClass = booking.status === 'confirmed' ? 'badge-success' : 
+                           booking.status === 'cancelled' ? 'badge-danger' : 'badge-warning';
+        
+        return `
+          <tr>
+            <td>${date.toLocaleDateString()}</td>
+            <td>${booking.classTime}</td>
+            <td>${userName}</td>
+            <td><span class="badge ${statusClass}">${booking.status}</span></td>
+            <td>${booking.zoomLink ? `<a href="${booking.zoomLink}" target="_blank">Join</a>` : 'Not set'}</td>
+            <td class="actions">
+              <button class="btn btn-primary btn-sm" onclick="editBooking('${booking._id}')">Edit</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    };
+
+    // Edit booking
+    const editBooking = (id) => {
+      const booking = allBookings.find(b => b._id === id);
+      if (!booking) return;
+
+      document.getElementById('booking-id').value = booking._id;
+      document.getElementById('booking-status').value = booking.status;
+      document.getElementById('booking-zoom-link').value = booking.zoomLink || '';
+      
+      document.getElementById('booking-modal').classList.add('active');
+    };
+
+    // Close modal
+    const closeBookingModal = () => {
+      document.getElementById('booking-modal').classList.remove('active');
+    };
+
+    // Save booking
+    const saveBooking = async (e) => {
+      e.preventDefault();
+      if (!requireAdmin()) return;
+
+      const bookingId = document.getElementById('booking-id').value;
+      const bookingData = {
+        status: document.getElementById('booking-status').value,
+        zoomLink: document.getElementById('booking-zoom-link').value
+      };
+
+      try {
+        await apiRequest(`/bookings/${bookingId}`, {
+          method: 'PUT',
+          body: JSON.stringify(bookingData)
+        });
+
+        closeBookingModal();
+        loadBookings();
+      } catch (error) {
+        alert(error.message || 'Failed to update booking');
+      }
+    };
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', loadBookings);
+
+    window.editBooking = editBooking;
+    window.closeBookingModal = closeBookingModal;
+    window.saveBooking = saveBooking;
+  </script>
+</body>
+</html>
+

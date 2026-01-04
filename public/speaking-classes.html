@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Speaking Classes - English Learning Platform</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <nav class="container">
+      <a href="/" class="logo">English Master</a>
+      <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/lessons.html">Lessons</a></li>
+        <li><a href="/speaking-classes.html">Speaking Classes</a></li>
+        <li id="auth-nav"></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="container" style="padding: 2rem 0;">
+      <h1 style="margin-bottom: 2rem; text-align: center;">Speaking Class Subscriptions</h1>
+      <p style="text-align: center; margin-bottom: 3rem; color: var(--text-light);">
+        Join group speaking classes to practice your English conversation skills with other students
+      </p>
+
+      <div id="plans-container" class="card-grid" style="max-width: 800px; margin: 0 auto;">
+        <div class="spinner"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2024 English Master. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    // Load subscription plans
+    const loadPlans = async () => {
+      try {
+        const plans = await subscriptionsAPI.getPlans();
+        displayPlans(plans);
+      } catch (error) {
+        console.error('Error loading plans:', error);
+        document.getElementById('plans-container').innerHTML = '<p>Error loading plans. Please try again.</p>';
+      }
+    };
+
+    // Display plans
+    const displayPlans = (plans) => {
+      const container = document.getElementById('plans-container');
+      container.innerHTML = '';
+
+      plans.forEach(plan => {
+        const planCard = document.createElement('div');
+        planCard.className = 'card';
+        planCard.style.textAlign = 'center';
+        planCard.innerHTML = `
+          <h2>${plan.name}</h2>
+          <div class="price" style="font-size: 2.5rem; margin: 1.5rem 0;">$${plan.price.toFixed(2)}</div>
+          <p style="margin-bottom: 1.5rem; color: var(--text-light);">${plan.description}</p>
+          <a href="/checkout.html?type=subscription&plan=${plan.type}&price=${plan.price}" class="btn btn-primary" style="width: 100%;">Subscribe Now</a>
+        `;
+        container.appendChild(planCard);
+      });
+    };
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!requireAuth()) return;
+      loadPlans();
+
+      // Update nav for auth
+      const user = getUser();
+      const authNav = document.getElementById('auth-nav');
+      if (user) {
+        authNav.innerHTML = `
+          <li><a href="/dashboard.html">Dashboard</a></li>
+          <li><button class="btn btn-primary" onclick="handleLogout()">Logout</button></li>
+        `;
+      } else {
+        authNav.innerHTML = `
+          <li><a href="/login.html" class="btn btn-outline">Login</a></li>
+          <li><a href="/register.html" class="btn btn-primary">Sign Up</a></li>
+        `;
+      }
+    });
+  </script>
+</body>
+</html>
+

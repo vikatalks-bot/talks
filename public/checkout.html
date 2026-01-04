@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout - English Learning Platform</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+  <header>
+    <nav class="container">
+      <a href="/" class="logo">English Master</a>
+      <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/dashboard.html">Dashboard</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="container" style="padding: 2rem 0; max-width: 800px;">
+      <h1 style="margin-bottom: 2rem;">Checkout</h1>
+
+      <div id="checkout-content">
+        <div class="spinner"></div>
+      </div>
+
+      <div id="payment-error" class="alert alert-error" style="display: none;"></div>
+      <div id="payment-success" class="alert alert-success" style="display: none;"></div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2024 English Master. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/payments.js"></script>
+  <script>
+    let checkoutItem = null;
+    let checkoutType = null;
+    let checkoutAmount = 0;
+
+    // Initialize checkout
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!requireAuth()) return;
+
+      // Get checkout parameters from URL
+      const urlParams = new URLSearchParams(window.location.search);
+      checkoutType = urlParams.get('type');
+      const itemId = urlParams.get('id');
+      const planType = urlParams.get('plan');
+      const planPrice = urlParams.get('price');
+
+      try {
+        if (checkoutType === 'lesson' && itemId) {
+          checkoutItem = await lessonsAPI.getById(itemId);
+          checkoutAmount = checkoutItem.price;
+        } else if (checkoutType === 'subscription' && planType && planPrice) {
+          checkoutItem = {
+            type: planType,
+            price: parseFloat(planPrice),
+            name: planType === 'monthly' ? 'Monthly Speaking Class' : 'Weekly Speaking Class'
+          };
+          checkoutAmount = checkoutItem.price;
+        } else {
+          throw new Error('Invalid checkout parameters');
+        }
+
+        displayCheckout();
+      } catch (error) {
+        console.error('Error loading checkout:', error);
+        document.getElementById('checkout-content').innerHTML = `
+          <div class="alert alert-error">Error loading checkout. Please try again.</div>
+          <a href="/lessons.html" class="btn btn-primary">Back to Lessons</a>
+        `;
+      }
+    });
+
+    // Display checkout form
+    const displayCheckout = () => {
+      const container = document.getElementById('checkout-content');
+      container.innerHTML = `
+        <div class="card" style="margin-bottom: 2rem;">
+          <h2>Order Summary</h2>
+          <div style="display: flex; justify-content: space-between; margin: 1rem 0; padding: 1rem 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+            <div>
+              <h3>${checkoutItem.title || checkoutItem.name}</h3>
+              <p style="color: var(--text-light);">${checkoutItem.description || checkoutItem.type + ' subscription'}</p>
+            </div>
+            <div style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">
+              $${checkoutAmount.toFixed(2)}
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 1.25rem; font-weight: bold; margin-top: 1rem;">
+            <span>Total:</span>
+            <span>$${checkoutAmount.toFixed(2)}</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 style="margin-bottom: 1.5rem;">Payment Method</h2>
+          
+          <div class="payment-methods">
+            <div class="payment-method" onclick="selectPaymentMethod('stripe')" id="stripe-method">
+              <h3>Credit/Debit Card</h3>
+              <p>Pay with Stripe</p>
+            </div>
+            <div class="payment-method" onclick="selectPaymentMethod('paypal')" id="paypal-method">
+              <h3>PayPal</h3>
+              <p>Pay with PayPal</p>
+            </div>
+          </div>
+
+          <div id="stripe-form" style="display: none; margin-top: 2rem;">
+            <div id="card-element" style="padding: 1rem; border: 2px solid var(--border-color); border-radius: 0.5rem; margin-bottom: 1rem;"></div>
+            <button class="btn btn-primary" style="width: 100%;" onclick="processStripePayment()">Pay $${checkoutAmount.toFixed(2)}</button>
+          </div>
+
+          <div id="paypal-form" style="display: none; margin-top: 2rem;">
+            <button class="btn btn-secondary" style="width: 100%;" onclick="processPayPalPayment()">Pay with PayPal</button>
+          </div>
+        </div>
+      `;
+    };
+
+    let selectedPaymentMethod = null;
+    let stripe = null;
+    let cardElement = null;
+
+    const selectPaymentMethod = (method) => {
+      selectedPaymentMethod = method;
+
+      // Update UI
+      document.querySelectorAll('.payment-method').forEach(el => el.classList.remove('selected'));
+      document.getElementById(`${method}-method`).classList.add('selected');
+
+      // Show/hide forms
+      document.getElementById('stripe-form').style.display = method === 'stripe' ? 'block' : 'none';
+      document.getElementById('paypal-form').style.display = method === 'paypal' ? 'block' : 'none';
+
+      // Initialize Stripe if needed
+      if (method === 'stripe' && !stripe) {
+        // Note: You need to get publishable key from backend or env
+        // For now, we'll use a placeholder - in production, fetch from backend
+        stripe = Stripe('pk_test_placeholder'); // Replace with actual key
+        const elements = stripe.elements();
+        cardElement = elements.create('card');
+        cardElement.mount('#card-element');
+      }
+    };
+
+    const processStripePayment = async () => {
+      try {
+        const itemId = checkoutType === 'lesson' ? checkoutItem._id : checkoutItem.type;
+        
+        // Create payment intent
+        const { clientSecret } = await paymentsAPI.createStripeIntent(checkoutType, itemId, checkoutAmount);
+
+        // Confirm payment
+        const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+          payment_method: {
+            card: cardElement
+          }
+        });
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        if (paymentIntent.status === 'succeeded') {
+          // Confirm on backend (this will create subscription if needed)
+          await paymentsAPI.confirmStripe(paymentIntent.id, checkoutType, itemId);
+
+          document.getElementById('payment-success').textContent = 'Payment successful! Redirecting...';
+          document.getElementById('payment-success').style.display = 'block';
+          setTimeout(() => {
+            window.location.href = '/dashboard.html';
+          }, 2000);
+        }
+      } catch (error) {
+        document.getElementById('payment-error').textContent = error.message || 'Payment failed';
+        document.getElementById('payment-error').style.display = 'block';
+      }
+    };
+
+    const processPayPalPayment = async () => {
+      try {
+        const itemId = checkoutType === 'lesson' ? checkoutItem._id : checkoutItem.type;
+        await paymentsAPI.createPayPal(checkoutType, itemId, checkoutAmount);
+      } catch (error) {
+        document.getElementById('payment-error').textContent = error.message || 'Payment failed';
+        document.getElementById('payment-error').style.display = 'block';
+      }
+    };
+
+    window.selectPaymentMethod = selectPaymentMethod;
+    window.processStripePayment = processStripePayment;
+    window.processPayPalPayment = processPayPalPayment;
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - English Learning Platform</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <nav class="container">
+      <a href="/" class="logo">English Master</a>
+      <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/lessons.html">Lessons</a></li>
+        <li><a href="/speaking-classes.html">Speaking Classes</a></li>
+        <li><a href="/dashboard.html" class="btn btn-outline">Dashboard</a></li>
+        <li><button class="btn btn-primary" onclick="handleLogout()">Logout</button></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="container" style="padding: 2rem 0;">
+      <h1 style="margin-bottom: 2rem;">My Dashboard</h1>
+
+      <div class="dashboard-grid">
+        <div class="stat-card card">
+          <div class="number" id="lessons-count">0</div>
+          <div class="label">Purchased Lessons</div>
+        </div>
+
+        <div class="stat-card card">
+          <div class="number" id="subscriptions-count">0</div>
+          <div class="label">Active Subscriptions</div>
+        </div>
+
+        <div class="stat-card card">
+          <div class="number" id="bookings-count">0</div>
+          <div class="label">Upcoming Bookings</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 3rem;">
+        <h2 style="margin-bottom: 1.5rem;">My Lessons</h2>
+        <div id="my-lessons" class="card-grid"></div>
+        <div id="no-lessons" style="display: none; text-align: center; padding: 2rem;">
+          <p>You haven't purchased any lessons yet.</p>
+          <a href="/lessons.html" class="btn btn-primary" style="margin-top: 1rem;">Browse Lessons</a>
+        </div>
+      </div>
+
+      <div style="margin-top: 3rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+          <h2>My Bookings</h2>
+          <a href="/booking.html" class="btn btn-primary" id="book-class-btn" style="display: none;">Book a Class</a>
+        </div>
+        <div id="my-bookings" class="card-grid"></div>
+        <div id="no-bookings" style="display: none; text-align: center; padding: 2rem;">
+          <p>You don't have any bookings yet.</p>
+          <a href="/speaking-classes.html" class="btn btn-primary" style="margin-top: 1rem;">Subscribe to Speaking Classes</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2024 English Master. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    // Load dashboard data
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!requireAuth()) return;
+
+      try {
+        const user = await authAPI.getMe();
+        const lessons = user.purchasedLessons || [];
+        const subscriptions = user.subscriptions || [];
+
+        // Update counts
+        document.getElementById('lessons-count').textContent = lessons.length;
+        document.getElementById('subscriptions-count').textContent = subscriptions.filter(s => s.status === 'active').length;
+
+        // Load bookings
+        const bookings = await bookingsAPI.getAll();
+        const upcomingBookings = bookings.filter(b => 
+          b.status === 'confirmed' && new Date(b.classDate) >= new Date()
+        );
+        document.getElementById('bookings-count').textContent = upcomingBookings.length;
+
+        // Display lessons
+        const lessonsContainer = document.getElementById('my-lessons');
+        if (lessons.length === 0) {
+          document.getElementById('no-lessons').style.display = 'block';
+        } else {
+          lessons.forEach(lesson => {
+            const lessonCard = document.createElement('div');
+            lessonCard.className = 'card lesson-card';
+            lessonCard.innerHTML = `
+              <h3>${lesson.title}</h3>
+              <p>${lesson.description}</p>
+              <p><strong>Level:</strong> ${lesson.level}</p>
+              ${lesson.videoUrl ? `<a href="${lesson.videoUrl}" target="_blank" class="btn btn-primary">Watch Lesson</a>` : ''}
+            `;
+            lessonsContainer.appendChild(lessonCard);
+          });
+        }
+
+        // Show book class button if user has active subscription
+        const hasActiveSubscription = subscriptions.some(s => s.status === 'active');
+        if (hasActiveSubscription) {
+          document.getElementById('book-class-btn').style.display = 'block';
+        }
+
+        // Display bookings
+        const bookingsContainer = document.getElementById('my-bookings');
+        if (upcomingBookings.length === 0 && !hasActiveSubscription) {
+          document.getElementById('no-bookings').style.display = 'block';
+        } else if (upcomingBookings.length > 0) {
+          upcomingBookings.forEach(booking => {
+            const bookingCard = document.createElement('div');
+            bookingCard.className = 'card';
+            const date = new Date(booking.classDate);
+            bookingCard.innerHTML = `
+              <h3>Speaking Class</h3>
+              <p><strong>Date:</strong> ${date.toLocaleDateString()}</p>
+              <p><strong>Time:</strong> ${booking.classTime}</p>
+              <p><strong>Status:</strong> ${booking.status}</p>
+              ${booking.zoomLink ? `<a href="${booking.zoomLink}" target="_blank" class="btn btn-primary">Join Class</a>` : ''}
+              <button class="btn btn-outline" onclick="cancelBooking('${booking._id}')" style="margin-top: 0.5rem;">Cancel</button>
+            `;
+            bookingsContainer.appendChild(bookingCard);
+          });
+        }
+      } catch (error) {
+        console.error('Error loading dashboard:', error);
+        if (error.message.includes('authorization') || error.message.includes('token')) {
+          authAPI.logout();
+        }
+      }
+    });
+
+    const cancelBooking = async (id) => {
+      if (!confirm('Are you sure you want to cancel this booking?')) return;
+      
+      try {
+        await bookingsAPI.cancel(id);
+        window.location.reload();
+      } catch (error) {
+        alert(error.message || 'Failed to cancel booking');
+      }
+    };
+
+    window.cancelBooking = cancelBooking;
+  </script>
+</body>
+</html>
+

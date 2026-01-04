@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book Speaking Class - English Learning Platform</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <nav class="container">
+      <a href="/" class="logo">English Master</a>
+      <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/dashboard.html">Dashboard</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="container" style="padding: 2rem 0; max-width: 1000px;">
+      <h1 style="margin-bottom: 2rem;">Book a Speaking Class</h1>
+
+      <div id="no-subscription" style="display: none; text-align: center; padding: 2rem;" class="card">
+        <h2>No Active Subscription</h2>
+        <p>You need an active subscription to book speaking classes.</p>
+        <a href="/speaking-classes.html" class="btn btn-primary" style="margin-top: 1rem;">Subscribe Now</a>
+      </div>
+
+      <div id="booking-content" style="display: none;">
+        <div class="card" style="margin-bottom: 2rem;">
+          <h2>Select Your Subscription</h2>
+          <select id="subscription-select" class="form-group" style="width: 100%; padding: 0.75rem; margin-top: 1rem;">
+            <option value="">Select a subscription...</option>
+          </select>
+        </div>
+
+        <div class="card" style="margin-bottom: 2rem;">
+          <h2>Select Date</h2>
+          <div id="calendar" class="calendar"></div>
+        </div>
+
+        <div class="card" style="margin-bottom: 2rem;">
+          <h2>Select Time</h2>
+          <div id="time-slots" class="time-slots"></div>
+        </div>
+
+        <button class="btn btn-primary" style="width: 100%; padding: 1rem; font-size: 1.25rem;" onclick="submitBooking()">Book Class</button>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2024 English Master. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/booking.js"></script>
+  <script>
+    let activeSubscriptions = [];
+    let selectedSubscriptionId = null;
+
+    // Load user subscriptions
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!requireAuth()) return;
+
+      try {
+        const subscriptions = await subscriptionsAPI.getMySubscriptions();
+        activeSubscriptions = subscriptions.filter(s => s.status === 'active');
+
+        if (activeSubscriptions.length === 0) {
+          document.getElementById('no-subscription').style.display = 'block';
+        } else {
+          document.getElementById('booking-content').style.display = 'block';
+          
+          // Populate subscription select
+          const select = document.getElementById('subscription-select');
+          activeSubscriptions.forEach(sub => {
+            const option = document.createElement('option');
+            option.value = sub._id;
+            option.textContent = `${sub.type} subscription - Expires: ${new Date(sub.endDate).toLocaleDateString()}`;
+            select.appendChild(option);
+          });
+
+          select.addEventListener('change', (e) => {
+            selectedSubscriptionId = e.target.value;
+          });
+
+          // Initialize calendar
+          initCalendar();
+        }
+      } catch (error) {
+        console.error('Error loading subscriptions:', error);
+        if (error.message.includes('authorization') || error.message.includes('token')) {
+          authAPI.logout();
+        }
+      }
+    });
+
+    const submitBooking = async () => {
+      if (!selectedSubscriptionId) {
+        alert('Please select a subscription');
+        return;
+      }
+
+      if (!selectedDate || !selectedTime) {
+        alert('Please select a date and time');
+        return;
+      }
+
+      try {
+        await createBooking(selectedSubscriptionId);
+      } catch (error) {
+        alert(error.message || 'Failed to create booking');
+      }
+    };
+
+    window.submitBooking = submitBooking;
+  </script>
+</body>
+</html>
+
